@@ -1,0 +1,175 @@
+---
+title: "Georgia_Runoff"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Georgia Senate Visualization Part 2: Runoff Edition
+
+## Introduction
+
+While the news was overshadowed by the attempted coup at The Capitol, history was made in Georgia earlier in January when Democrats Raphael Warnock and Jon Ossoff were elected to become Georgia's first black and Jewish senators in what was also Georgias highest turnout runoff. As reported by [FiveThirtyEight](https://fivethirtyeight.com/features/how-democrats-won-the-georgia-runoffs/): 
+
+"Over 4.4 million people voted in Tuesday’s election — more than double the number who voted in Georgia’s 2008 Senate runoff, which was previously the highest-turnout runoff in Georgia history. A full 60 percent of eligible voters (as estimated by Michael McDonald of the University of Florida) cast a ballot — higher than Georgia’s turnout rate in the 2016 presidential election!"
+
+I personally was pessimistic about this kind of turnout, but I would be lying if I said I was displeased at being wrong in this instance. Their double victory is particularly significant given that it narrowly gives Democrats control of the senate; Democrats will now control 50 seats (two are Independents who caucus with Democrats) and have a tie-breaking vote in Vice President Harris.
+
+In this article we'll examine the results of the runoff and visualize it using R's ggplot2 library, as well as examine some demographic and economic statistics to see if any trends emerge to explain the results. If you have not already had a chance to check it out, you can find my writeup of the general election [here](https://mthoburn96.medium.com/visualizing-the-2020-georgia-races-with-r-4891d80c783e). As always, the code and source data used for this article can be found on my [Github](https://github.com/mrthoburn/georgia_runoff). 
+
+## Read the Data
+```{r read_data}
+library(usmap)
+library(ggplot2)
+
+ga <- read.table('Georgia.csv',header = TRUE,sep=",")
+ga$BIDEN.VOTES <- as.numeric(gsub(",", "",ga$BIDEN.VOTES))
+ga$TRUMP.VOTES <- as.numeric(gsub(",", "",ga$TRUMP.VOTES))
+ga$OSSOFF.VOTES <- as.numeric(gsub(",", "",ga$OSSOFF.VOTES))
+ga$PERDUE.VOTES <- as.numeric(gsub(",", "",ga$PERDUE.VOTES))
+ga$WARNOCK.VOTES <- as.numeric(gsub(",", "",ga$WARNOCK.VOTES))
+ga$LOEFFLER.VOTES <- as.numeric(gsub(",", "",ga$LOEFFLER.VOTES))
+ga$OSSOFF.VOTES.2 <- as.numeric(gsub(",", "",ga$OSSOFF.VOTES.2))
+ga$PERDUE.VOTES.2 <- as.numeric(gsub(",", "",ga$PERDUE.VOTES.2))
+ga$WARNOCK.VOTES.2 <- as.numeric(gsub(",", "",ga$WARNOCK.VOTES.2))
+ga$LOEFFLER.VOTES.2 <- as.numeric(gsub(",", "",ga$LOEFFLER.VOTES.2))
+
+head(ga)
+```
+
+### Discussion 
+
+The data includes election results for both the general and runoff elections, with runoff election results indicated by a "2". Election data was pulled from [Politico](https://www.politico.com/2020-election/results/georgia/senate-runoff-map-perdue-ossoff-20210105/). The FIPS codes are used by ggplot for mapping purposes. 
+
+## Overall Results
+
+````{r results}
+# Count sum of votes by candidate
+biden.sum <- sum(ga$BIDEN.VOTES)
+trump.sum <- sum(ga$TRUMP.VOTES)
+
+ossoff.sum <- sum(ga$OSSOFF.VOTES)
+perdue.sum <- sum(ga$PERDUE.VOTES)
+warnock.sum <- sum(ga$WARNOCK.VOTES,na.rm=T)
+loeffler.sum <- sum(ga$LOEFFLER.VOTES,na.rm=T)
+
+ossoff.sum.2 <- sum(ga$OSSOFF.VOTES.2)
+perdue.sum.2 <- sum(ga$PERDUE.VOTES.2)
+warnock.sum.2 <- sum(ga$WARNOCK.VOTES.2,na.rm=T)
+loeffler.sum.2 <- sum(ga$LOEFFLER.VOTES.2,na.rm=T)
+
+candidate <- c('Ossoff', 'Perdue','Warnock','Loeffler')
+sum <- c(ossoff.sum.2, perdue.sum.2, warnock.sum.2, loeffler.sum.2)
+party <- c('D','R','D','R')
+sum.df <- data.frame(candidate,sum,party)
+sum.df$candidate <- factor(sum.df$candidate, levels = c(sum.df[order(sum.df$sum,decreasing=T),]$candidate))
+
+ggplot(data=sum.df, aes(x=candidate,y=sum,fill=party)) + geom_bar(stat="identity") + scale_fill_manual(values = c('#00BFC4','#F8766D'))  + coord_cartesian(ylim = c(2000000,2300000))
+```
+
+## Results by County
+
+We can also visualize the results by county, using a three-color scale to indicate the degree to which a candidate won a county. Here we will only do so for Ossoff and Perdue, not to exclude Warnock and Loeffler, but the results are nearly identical. If you're curious what their maps look like, they are as math textbooks like to say, left as an exercise for the reader. We can however compare Warnock's and Ossoff's performances to see if anything noteworthy stands out (We'll examine this further later in the article).
+
+```{r results_county}
+ga$OSSOFF.PERDUE.VOTE.DIFF <- ga$OSSOFF.VOTES.2 - ga$PERDUE.VOTES.2
+ga$OSSOFF.PERDUE.PCT.DIFF <- ga$OSSOFF.PCT.2 - ga$PERDUE.PCT.2
+
+plot_usmap(include = c("GA"),regions="counties",data=ga,values="OSSOFF.PERDUE.PCT.DIFF") +  scale_fill_gradient2(low="red",mid="white",high="blue",midpoint=0,name="Ossoff - Perdue Percent Votes") + theme(legend.position = "right")
+
+plot_usmap(include = c("GA"),regions="counties",data=ga,values="OSSOFF.PERDUE.VOTE.DIFF") + scale_fill_gradient2(low="red",mid="white",high="blue",midpoint=0,name="Ossoff - Perdue Raw Votes") + theme(legend.position = "right")
+
+# Compare dem candidates to each other
+ga$OSSOFF.WARNOCK.RATIO <- ga$OSSOFF.VOTES.2 / ga$WARNOCK.VOTES.2
+
+plot_usmap(include = c("GA"),regions="counties",data=ga,values="OSSOFF.WARNOCK.RATIO") + scale_fill_gradient2(low="red",mid="white",high="blue",midpoint=1,name="Ossoff/Warnock Vote Ratio") + theme(legend.position = "right")
+
+```
+
+### Discussion
+
+If you read my first article, you will not find these maps particularly surprising, as they're nearly identical to the results from the general election at both the presidential and senatorial levels. Democrats ran up high margins in the Atlanta metro area s well as the [Black Belt](https://en.wikipedia.org/wiki/Black_Belt_in_the_American_South) that cuts through mid Georgia (Which includes cities such as Columbus, Macon, and Augusta), and the counties containing Athens (home of UGA), and Savannah. 
+
+If we compare Ossoff's and Warnock's performances, we see that they track extremely closely, only differing by a few percent in either direction, although Warnock seems to have performed slightly better overall. Its possible that these small fluctuations are due to normal statistical variances that arise by chance, particularly in small counties where a three percent swing might only be a few votes.  
+
+## Turnout relative to General
+
+We can also compare the candidates' performances to those of the general election, both at the overall and county levels.
+
+```{r turnout_general}
+candidate <- c('Biden','Trump','Ossoff','Perdue','Warnock','Loeffler','Ossoff (r)', 'Perdue (r)','Warnock (r)','Loeffler (r)')
+sum <- c(biden.sum, trump.sum, ossoff.sum, perdue.sum, warnock.sum, loeffler.sum, ossoff.sum.2, perdue.sum.2, warnock.sum.2, loeffler.sum.2)
+party <- c('D','R','D','R','D','R','D','R','D','R')
+sum.df <- data.frame(candidate,sum,party)
+sum.df$candidate <- factor(sum.df$candidate, levels = c(sum.df[order(sum.df$sum,decreasing=T),]$candidate))
+
+ggplot(data=sum.df, aes(x=candidate,y=sum,fill=party)) + geom_bar(stat="identity") + scale_fill_manual(values = c('#00BFC4','#F8766D')) +  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+library(reshape2)
+ga$OSSOFF.PCT.CHANGE <- ga$OSSOFF.VOTES.2/ga$OSSOFF.VOTES
+ga$PERDUE.PCT.CHANGE <- ga$PERDUE.VOTES.2/ga$PERDUE.VOTES
+tmp.box <- melt(ga,measure.vars=c('OSSOFF.PCT.CHANGE','PERDUE.PCT.CHANGE'))
+
+ggplot(tmp.box) + geom_boxplot(aes(x=variable, y=value,fill=variable)) + xlab("Candidate") + ylab ("Percent change from general") + scale_x_discrete(labels=c("Ossoff","Perdue")) + scale_fill_manual(values=c('#00BFC4','#F8766D'))
+
+plot_usmap(include = c("GA"),regions="counties",data=ga,values="OSSOFF.PCT.CHANGE") +  scale_fill_gradient2(low="red",mid="white",high="blue",midpoint=1.0,name="Ossoff: Runoff votes as percent of General") + theme(legend.position = "right")
+
+plot_usmap(include = c("GA"),regions="counties",data=ga,values="PERDUE.PCT.CHANGE") +  scale_fill_gradient2(low="red",mid="white",high="blue",midpoint=1.0,name="Perdue: Runoff votes as percent of General") + theme(legend.position = "right")
+
+```
+
+### Discussion
+
+The most noteworthy detail in my opinion is that Perdue had the votes to win, were it not for the rule mandating a majority rather than a plurality of votes. (The fact many historians argue this rule has its roots in [black disenfranchisement](https://www.vox.com/21551855/georgia-ossoff-perdue-loeffler-warnock-runoff-election-2020-results) makes it all the more poetic considering that a major contributor to their victory in both the general and runoff elections was black voter turnout.) Furthermore, if he had maintained his lead over Ossoff going into the runoff and had Ossoff's voter retention rate (95% compared to 89%), he would have won. (It is worth noting that a retention rate of 89% is still extremely high for a runoff, so credit where credit is due.) 
+
+It's worth taking a moment to appreciate Ossoff's absurdly high voter retention, including the fact that he managed to increase his vote share in some counties between November and January. This is a testament to the work of not only the Ossoff and Warnock campaigns, but also the work of grassroots organizations like the [New Georgia Project](https://newgeorgiaproject.org/) and [Black Voters Matter](https://blackvotersmatterfund.org/).
+
+It's also worth noting that Libertarian candidate Shane Hazel's presence in the general election back in November is also a contributing factor, given that if he sat out the race or endorsed Perdue before November then Perdue would have won a majority outright. So thank you, Shane. Enjoy your $2000 stimulus check. If there are any left-leaning third party types reading this, take note of this as an example of why change is best enacted from within in my opinion (at least under the current winner-take-all system. Feel free to go wild if we get multi-member districts or proportional representation). If there are any right-leaning third party types reading this, y'all are doing great; keep doing what you're doing.
+
+We can also plot the retention rate geographically to see if anything noteworthy jumps out, although nothing appears to. As before, were this not the case it might indicate some kind of demographic or strategy-based trend that might be worth further analysis. 
+
+## Do Demographics Explain the Results?
+
+Here we will shift gears and explore some basic demographic data for each county to see if there are any trends that might explain the election results. This is definitely no substitute for thorough academic research by actual political scientists, but it may reveal trends that guide hypotheses and future inquiry.  Racial demographic data was pulled from the Georgia Secretary of State [website](https://sos.ga.gov/index.php/Elections/voter_registration_statistics), income pulled from [Wikipedia](https://en.wikipedia.org/wiki/List_of_Georgia_(U.S._state)_locations_by_per_capita_income), and poverty rate statistics from [IndexMundi](https://www.indexmundi.com/facts/united-states/quick-facts/georgia/percent-of-people-of-all-ages-in-poverty#table).
+
+Going into the analysis I have two (and a half) questions:
+
+1. What might explain Ossoff's vote retention between November and January relative to Perdue (and vise versa)?
+
+2. What might explain the difference between Ossoff's and Warnock's vote share in January?
+
+We'll perform some basic correlation and regression analysis to see to what extent these questions can be answered by some very basic demographic statistics. 
+
+```{r why_perdue_bad}
+dm <- read.table('Demographics.csv',header=T,sep=',')
+#head(dm)
+dm$PCT.WHITE <- (dm$WH.MALE.VOTERS + dm$WH.FEMALE.VOTERS) / dm$TOTAL.VOTERS
+dm$PCT.BLACK <- (dm$BH.MALE.VOTERS + dm$BH.FEMALE.VOTERS) / dm$TOTAL.VOTERS
+
+tmp <- data.frame(ga$OSSOFF.PCT.CHANGE, ga$PERDUE.PCT.CHANGE, ga$OSSOFF.WARNOCK.RATIO, ga$TRUMP.PCT, log10(dm$TOTAL.VOTERS), dm$PCT.BLACK, dm$PCT.WHITE, dm$PER.CAPITA.INCOME, dm$MEDIAN.FAMILY.INCOME, dm$MEDIAN.HOUSEHOLD.INCOME, dm$POVERTY.RATE)
+
+cor(tmp)[,1:4]
+
+ggplot(tmp,aes(x=dm.PCT.WHITE ,y=ga.TRUMP.PCT))  + geom_point() + geom_smooth(method = "lm", fill = NA)
+ggplot(tmp,aes(x=dm.PCT.BLACK ,y=ga.OSSOFF.PCT.CHANGE))  + geom_point() + geom_smooth(method = "lm", fill = NA)
+ggplot(tmp,aes(x=dm.PER.CAPITA.INCOME ,y=ga.PERDUE.PCT.CHANGE))  + geom_point() + geom_smooth(method = "lm", fill = NA)
+ggplot(tmp,aes(x=dm.PER.CAPITA.INCOME ,y=ga.OSSOFF.WARNOCK.RATIO))  + geom_point() + geom_smooth(method = "lm", fill = NA)
+```
+
+### Discussion
+
+The most immediate trend is unrelated to my initial inquiries, and realistically should have been an analyzed in my first Georgia article, but that's the extent to which white racial homogeneity predicts support for republican candidates (in this case Trump). I was initially curious to see if Trump's unsubstantiated claims (read: blatant lies) about voter fraud and rigged elections in Georgia would discourage republican turnout, however this trend is worht discussing 
+
+Fitting a linear model of percent of county residents who identify as white to Trump's percent vote share in November, we find that whiteness explains almost 90% of the variance in Trump's percent vote share across all counties (contrasted with economic indicators such as poverty rate and per capita income which explain five and nearly zero percent variance respectively or population size which only explains seven percent. R^2 calculations left as an exercise for the reader). While further research is needed to draw any definitive conclusions, this makes for a compelling argument that Republican support is driven largely by white identarianism and racial grievance, consciously or otherwise.
+
+Shifting back to the initial queries, we find much less compelling relationships, although there are some worth examining. If we look to predictors of Ossoff's voter retention, we find a weak but nonnegligable relationship with the county percent black population. This could be due to the concerted effort of registering and mobilizing black voters both by the two campaigns and grassroots organizations. 
+
+Looking at Perdue's retention, we see that per capita income for a county is the best predictor (although still quite noisy). While we can't draw any immediate conclusions from this relationship, it seems reasonable to indulge the possibility that running on the platform of "I need to be in the senate in order to stop stimulus checks and a $15 minimum wage" doesn't motivate people in poorer counties to come back to the polls.
+
+Interestingly, per capita income is also the best predictor of counties in which Warnock outran Ossoff. On the flip side, poverty rate is the best predictor of counties in which Ossoff outran Warnock. I don't have any immediate hypotheses as to why this might be the case, but further investigation might be warranted.
+
+## Conclusion
+
+If you're like me, exhausted as you are from the last year and a half of following campaigns (and I didn't even work on a campaign), its impossible not to take this information and start thinking about what it means for 2022. Rev. Warnock will be up for reelection as his election was only to finish the term after the seat was vacated by Johnny Isakson due to ill health and temporary filled by Kelly Loeffler, and Gov. Brian Kemp will be up for reelection as well. Given that Trump has disowned Kemp for not refusing to hand him an election that he irrefutably lost (live by Trump, die by Trump, so the Faustian bargain goes), Kemp will no doubt be primaried from the right by a Trump alcolyte and face an uphill battle for reelection. On the Democratic side, it remains to be seen whether or not Stacy Abrams will run again, although if she does choose to run it's all but certain she will be the nominee. Will Democrats be able to build on the momentum and infrastructure they've established over the last several years or will things revert back to the mean? In my opinion it will come down to whether or not Democrats can maintain their massive voter turnout, and whether or not the suburbs around Atlanta continue to trend blue in a post-Trump world. Only time will tell. 
